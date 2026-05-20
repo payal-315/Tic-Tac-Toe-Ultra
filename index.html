@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tic-Tac-Toe Ultra</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <canvas id="background" aria-hidden="true"></canvas>
+
+    <main class="game-shell" aria-label="Tic-Tac-Toe Ultra">
+      <section class="game-panel">
+        <header class="game-header">
+          <p class="eyebrow">Tic-Tac-Toe Ultra</p>
+          <h1 id="status">Player X</h1>
+        </header>
+
+        <div class="board" role="grid" aria-label="Tic-tac-toe board">
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 1"></button>
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 2"></button>
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 3"></button>
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 4"></button>
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 5"></button>
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 6"></button>
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 7"></button>
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 8"></button>
+          <button class="cell" type="button" role="gridcell" aria-label="Cell 9"></button>
+        </div>
+
+        <footer class="score-row" aria-live="polite">
+          <span id="score-x">X: 0</span>
+          <span aria-hidden="true">|</span>
+          <span id="score-o">O: 0</span>
+        </footer>
+      </section>
+    </main>
+
+    <div class="overlay" id="overlay" aria-hidden="true">
+      <div class="result-box" role="dialog" aria-modal="true" aria-labelledby="result-text">
+        <div class="result-symbol" id="result-symbol">X</div>
+        <h2 id="result-text">Victorious!</h2>
+        <div class="actions">
+          <button class="primary" type="button" id="replay">Replay</button>
+          <button class="secondary" type="button" id="reset">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
