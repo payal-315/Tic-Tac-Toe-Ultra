@@ -16,6 +16,21 @@
           <h1 id="status">Player X</h1>
         </header>
 
+        <div class="mode-toggle" role="group" aria-label="Game mode">
+          <button class="mode-button" type="button" data-mode="human">2 Players</button>
+          <button class="mode-button active" type="button" data-mode="ai">Vs AI</button>
+        </div>
+
+        <div class="choice-group" role="group" aria-label="Choose your symbol">
+          <button class="choice-button active" type="button" data-player="X">You are X</button>
+          <button class="choice-button" type="button" data-player="O">You are O</button>
+        </div>
+
+        <div class="difficulty-group" role="group" aria-label="AI difficulty">
+          <button class="difficulty-button active" type="button" data-difficulty="hard">Hard</button>
+          <button class="difficulty-button" type="button" data-difficulty="easy">Easy</button>
+        </div>
+
         <div class="board" role="grid" aria-label="Tic-tac-toe board">
           <button class="cell" type="button" role="gridcell" aria-label="Cell 1"></button>
           <button class="cell" type="button" role="gridcell" aria-label="Cell 2"></button>
