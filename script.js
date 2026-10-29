@@ -39,9 +39,11 @@ let aiSymbol = "O";
 let firstPlayer = "p1";
 let aiThinking = false;
 let aiTimeout = null;
+let aiWatchdogTimeout = null;
 let gameGeneration = 0;
 
 const AI_DELAY_MS = 520;
+const AI_WATCHDOG_MS = 2000;
 const DIFFICULTY_BEST_MOVE_CHANCE = { easy: 0.3, medium: 0.5, hard: 1 };
 
 function isHumanTurn() {
@@ -281,26 +283,80 @@ function chooseAiMove() {
     : availableMoves[Math.floor(Math.random() * availableMoves.length)];
 }
 
+function chooseRandomAiMove() {
+  const availableMoves = getAvailableMoves(board);
+  if (availableMoves.length === 0) return null;
+  return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+}
+
 function queueAiTurn() {
   if (gameMode !== "ai" || gameOver || currentTurn !== aiSymbol || aiThinking || aiTimeout !== null) return;
 
   aiThinking = true;
   setTurnLabel();
   const scheduledGeneration = gameGeneration;
+  let resolved = false;
 
-  const timeoutId = window.setTimeout(() => {
-    if (aiTimeout === timeoutId) aiTimeout = null;
-    if (scheduledGeneration !== gameGeneration || gameMode !== "ai" || gameOver || currentTurn !== aiSymbol) return;
+  const resolveAiTurn = (forceRandomMove = false) => {
+    if (resolved) return;
+    resolved = true;
+    if (aiTimeout !== null) window.clearTimeout(aiTimeout);
+    if (aiWatchdogTimeout !== null) window.clearTimeout(aiWatchdogTimeout);
+    aiTimeout = null;
+    aiWatchdogTimeout = null;
 
-    const move = chooseAiMove();
-
-    if (move !== null) {
-      makeMove(move, true);
-    } else {
-      setTurnLabel();
+    if (scheduledGeneration !== gameGeneration || gameMode !== "ai" || gameOver || currentTurn !== aiSymbol) {
+      if (scheduledGeneration === gameGeneration) {
+        aiThinking = false;
+        setTurnLabel();
+      }
+      return;
     }
-  }, AI_DELAY_MS);
-  aiTimeout = timeoutId;
+
+    const aiMoveCount = board.filter((cell) => cell === aiSymbol).length;
+    let moved = false;
+
+    try {
+      const move = forceRandomMove ? chooseRandomAiMove() : chooseAiMove();
+      if (!Number.isInteger(move) || board[move] !== "") {
+        throw new Error("AI returned an invalid or occupied board cell");
+      }
+      makeMove(move, true);
+      moved = board[move] === aiSymbol;
+    } catch (error) {
+      console.error("AI move failed; trying a random empty cell instead.", error);
+      if (board.filter((cell) => cell === aiSymbol).length === aiMoveCount) {
+        const fallbackMove = chooseRandomAiMove();
+        if (fallbackMove !== null && board[fallbackMove] === "") {
+          try {
+            aiThinking = true;
+            makeMove(fallbackMove, true);
+            moved = board[fallbackMove] === aiSymbol;
+          } catch (fallbackError) {
+            console.error("Random AI fallback also failed.", fallbackError);
+          }
+        }
+      }
+    } finally {
+      if (scheduledGeneration === gameGeneration && gameMode === "ai") {
+        if (!moved && !gameOver && currentTurn === aiSymbol) {
+          if (board.filter((cell) => cell === aiSymbol).length > aiMoveCount) {
+            const winner = getWinnerFromBoard();
+            if (winner) finishRound(winner);
+            else if (board.every(Boolean)) finishRound(null);
+            else currentTurn = youSymbol;
+          } else {
+            currentTurn = youSymbol;
+          }
+        }
+        aiThinking = false;
+        setTurnLabel();
+      }
+    }
+  };
+
+  aiTimeout = window.setTimeout(() => resolveAiTurn(false), AI_DELAY_MS);
+  aiWatchdogTimeout = window.setTimeout(() => resolveAiTurn(true), AI_WATCHDOG_MS);
 }
 
 function cancelAiTurn() {
@@ -308,6 +364,10 @@ function cancelAiTurn() {
   if (aiTimeout !== null) {
     window.clearTimeout(aiTimeout);
     aiTimeout = null;
+  }
+  if (aiWatchdogTimeout !== null) {
+    window.clearTimeout(aiWatchdogTimeout);
+    aiWatchdogTimeout = null;
   }
   aiThinking = false;
 }
