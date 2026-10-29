@@ -9,6 +9,9 @@ const replayButton = document.querySelector("#replay");
 const resetButton = document.querySelector("#reset");
 const canvas = document.querySelector("#background");
 const ctx = canvas.getContext("2d");
+const modeButtons = document.querySelectorAll(".mode-button");
+const playerButtons = document.querySelectorAll(".choice-button");
+const difficultyButtons = document.querySelectorAll(".difficulty-button");
 
 const wins = [
   [0, 1, 2],
@@ -27,8 +30,34 @@ let gameOver = false;
 let xScore = 0;
 let oScore = 0;
 let stickers = [];
+let gameMode = "ai";
+let difficulty = "hard";
+let humanSymbol = "X";
+let aiThinking = false;
+
+function isHumanTurn() {
+  if (gameMode !== "ai") return true;
+  return (xTurn && humanSymbol === "X") || (!xTurn && humanSymbol === "O");
+}
 
 function setTurnLabel() {
+  if (gameOver) {
+    statusLabel.textContent = "Game Over";
+    statusLabel.style.color = "var(--text)";
+    return;
+  }
+
+  if (gameMode === "ai") {
+    if (isHumanTurn()) {
+      statusLabel.textContent = humanSymbol === "X" ? "Your turn" : "Your turn";
+      statusLabel.style.color = humanSymbol === "X" ? "var(--x)" : "var(--o)";
+    } else {
+      statusLabel.textContent = "AI turn";
+      statusLabel.style.color = xTurn ? "var(--x)" : "var(--o)";
+    }
+    return;
+  }
+
   statusLabel.textContent = xTurn ? "Player X" : "Player O";
   statusLabel.style.color = xTurn ? "var(--x)" : "var(--o)";
 }
@@ -38,8 +67,21 @@ function updateScore() {
   scoreO.textContent = `O: ${oScore}`;
 }
 
+function getWinnerFromBoard(gameBoard = board) {
+  for (const [a, b, c] of wins) {
+    if (gameBoard[a] && gameBoard[a] === gameBoard[b] && gameBoard[a] === gameBoard[c]) {
+      return gameBoard[a];
+    }
+  }
+  return "";
+}
+
 function makeMove(index) {
-  if (board[index] || gameOver) return;
+  if (board[index] || gameOver || aiThinking) return;
+
+  if (gameMode === "ai" && !isHumanTurn()) {
+    return;
+  }
 
   const symbol = xTurn ? "X" : "O";
   board[index] = symbol;
@@ -47,7 +89,7 @@ function makeMove(index) {
   cells[index].classList.add(symbol.toLowerCase());
   cells[index].setAttribute("aria-label", `Cell ${index + 1}, ${symbol}`);
 
-  const winner = getWinner();
+  const winner = getWinnerFromBoard();
   if (winner) {
     gameOver = true;
     winner === "X" ? xScore++ : oScore++;
@@ -64,16 +106,10 @@ function makeMove(index) {
 
   xTurn = !xTurn;
   setTurnLabel();
-}
 
-function getWinner() {
-  for (const [a, b, c] of wins) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return board[a];
-    }
+  if (gameMode === "ai" && !isHumanTurn() && !gameOver) {
+    queueAiTurn();
   }
-
-  return "";
 }
 
 function showResult(symbol, message) {
@@ -90,6 +126,11 @@ function resetGame(resetScores = false) {
   board = Array(9).fill("");
   xTurn = true;
   gameOver = false;
+  aiThinking = false;
+
+  if (gameMode === "ai" && humanSymbol === "O") {
+    xTurn = false;
+  }
 
   cells.forEach((cell, index) => {
     cell.textContent = "";
@@ -106,6 +147,10 @@ function resetGame(resetScores = false) {
   overlay.classList.remove("show");
   overlay.setAttribute("aria-hidden", "true");
   setTurnLabel();
+
+  if (gameMode === "ai" && !isHumanTurn() && !gameOver) {
+    queueAiTurn();
+  }
 }
 
 function resizeCanvas() {
@@ -155,8 +200,145 @@ function drawBackground() {
   requestAnimationFrame(drawBackground);
 }
 
+function getAvailableMoves(gameBoard) {
+  return gameBoard
+    .map((cell, index) => (cell === "" ? index : null))
+    .filter((index) => index !== null);
+}
+
+function minimax(gameBoard, depth, isMaximizing, aiSymbol, humanSymbol) {
+  const winner = getWinnerFromBoard(gameBoard);
+
+  if (winner === aiSymbol) return 10 - depth;
+  if (winner === humanSymbol) return depth - 10;
+  if (gameBoard.every(Boolean)) return 0;
+
+  if (isMaximizing) {
+    let bestScore = -Infinity;
+
+    for (const move of getAvailableMoves(gameBoard)) {
+      const nextBoard = [...gameBoard];
+      nextBoard[move] = aiSymbol;
+      const score = minimax(nextBoard, depth + 1, false, aiSymbol, humanSymbol);
+      bestScore = Math.max(bestScore, score);
+    }
+
+    return bestScore;
+  }
+
+  let bestScore = Infinity;
+
+  for (const move of getAvailableMoves(gameBoard)) {
+    const nextBoard = [...gameBoard];
+    nextBoard[move] = humanSymbol;
+    const score = minimax(nextBoard, depth + 1, true, aiSymbol, humanSymbol);
+    bestScore = Math.min(bestScore, score);
+  }
+
+  return bestScore;
+}
+
+function findBestMove() {
+  const aiSymbol = humanSymbol === "X" ? "O" : "X";
+  const humanMark = humanSymbol;
+
+  let bestScore = -Infinity;
+  let bestMove = null;
+
+  for (const move of getAvailableMoves(board)) {
+    const nextBoard = [...board];
+    nextBoard[move] = aiSymbol;
+
+    const score = minimax(nextBoard, 0, false, aiSymbol, humanMark);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
+  }
+
+  return bestMove;
+}
+
+function chooseAiMove() {
+  const availableMoves = getAvailableMoves(board);
+
+  if (availableMoves.length === 0) return null;
+
+  if (difficulty === "easy") {
+    return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+  }
+
+  return findBestMove();
+}
+
+function queueAiTurn() {
+  if (gameMode !== "ai" || gameOver || isHumanTurn()) return;
+
+  aiThinking = true;
+  setTurnLabel();
+
+  window.setTimeout(() => {
+    if (gameOver) return;
+
+    const move = chooseAiMove();
+
+    aiThinking = false;
+
+    if (move !== null) {
+      makeMove(move);
+    } else {
+      setTurnLabel();
+    }
+  }, 420);
+}
+
+function setGameMode(mode) {
+  gameMode = mode;
+  modeButtons.forEach((button) => {
+    const isActive = button.dataset.mode === mode;
+    button.classList.toggle("active", isActive);
+  });
+
+  resetGame(true);
+}
+
+function setHumanSymbol(symbol) {
+  humanSymbol = symbol;
+  playerButtons.forEach((button) => {
+    const isActive = button.dataset.player === symbol;
+    button.classList.toggle("active", isActive);
+  });
+
+  resetGame(true);
+}
+
+function setDifficulty(level) {
+  difficulty = level;
+  difficultyButtons.forEach((button) => {
+    const isActive = button.dataset.difficulty === level;
+    button.classList.toggle("active", isActive);
+  });
+
+  if (gameMode === "ai") {
+    resetGame(true);
+  }
+}
+
 cells.forEach((cell, index) => {
   cell.addEventListener("click", () => makeMove(index));
+});
+
+modeButtons.forEach((button) => {
+  button.addEventListener("click", () => setGameMode(button.dataset.mode));
+});
+
+playerButtons.forEach((button) => {
+  button.addEventListener("click", () => setHumanSymbol(button.dataset.player));
+});
+
+difficultyButtons.forEach((button) => {
+  button.addEventListener("click", () => setDifficulty(button.dataset.difficulty));
 });
 
 replayButton.addEventListener("click", () => resetGame(false));
