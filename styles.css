@@ -44,7 +44,7 @@ body {
   height: min(88vh, 620px);
   min-height: 520px;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto auto auto 1fr auto;
   background: var(--panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
@@ -72,6 +72,46 @@ h1 {
   text-transform: uppercase;
 }
 
+.mode-toggle,
+.choice-group,
+.difficulty-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0 0;
+}
+
+.mode-button,
+.choice-button,
+.difficulty-button {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  padding: 10px 8px;
+  font: 900 0.78rem Arial, Helvetica, sans-serif;
+  text-transform: uppercase;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.mode-button.active,
+.choice-button.active,
+.difficulty-button.active {
+  background: rgba(0, 255, 200, 0.12);
+  border-color: rgba(0, 255, 200, 0.5);
+  color: var(--x);
+}
+
+.mode-button:hover,
+.choice-button:hover,
+.difficulty-button:hover,
+.mode-button:focus-visible,
+.choice-button:focus-visible,
+.difficulty-button:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+}
+
 .board {
   align-self: center;
   display: grid;
@@ -81,6 +121,7 @@ h1 {
   aspect-ratio: 1;
   width: 100%;
   min-height: 0;
+  margin-top: 12px;
 }
 
 .cell {
