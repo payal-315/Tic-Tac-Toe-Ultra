@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "build": "node build.js",
+    "test:ai": "node verify-ai.js",
+    "test:scoring": "node verify-scoring.js",
     "start": "npx serve ."
   }
 }

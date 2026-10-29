@@ -7,13 +7,12 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <canvas id="background" aria-hidden="true"></canvas>
-
     <main class="game-shell" aria-label="Tic-Tac-Toe Ultra">
+      <canvas id="background" aria-hidden="true"></canvas>
       <section class="game-panel">
         <header class="game-header">
           <p class="eyebrow">Tic-Tac-Toe Ultra</p>
-          <h1 id="status">Player X</h1>
+          <h1 id="status">YOUR TURN</h1>
         </header>
 
         <div class="mode-toggle" role="group" aria-label="Game mode">
@@ -22,13 +21,19 @@
         </div>
 
         <div class="choice-group" role="group" aria-label="Choose your symbol">
-          <button class="choice-button active" type="button" data-player="X">You are X</button>
-          <button class="choice-button" type="button" data-player="O">You are O</button>
+          <button class="choice-button active" type="button" data-player="X">You: X</button>
+          <button class="choice-button" type="button" data-player="O">You: O</button>
+        </div>
+
+        <div class="first-player-group" role="group" aria-label="Who goes first">
+          <button class="first-player-button active" type="button" data-first="p1">You First</button>
+          <button class="first-player-button" type="button" data-first="p2">AI First</button>
         </div>
 
         <div class="difficulty-group" role="group" aria-label="AI difficulty">
-          <button class="difficulty-button active" type="button" data-difficulty="hard">Hard</button>
           <button class="difficulty-button" type="button" data-difficulty="easy">Easy</button>
+          <button class="difficulty-button" type="button" data-difficulty="medium">Medium</button>
+          <button class="difficulty-button active" type="button" data-difficulty="hard">Hard</button>
         </div>
 
         <div class="board" role="grid" aria-label="Tic-tac-toe board">
@@ -44,9 +49,9 @@
         </div>
 
         <footer class="score-row" aria-live="polite">
-          <span id="score-x">X: 0</span>
+          <span id="score-p1">YOU: 0</span>
           <span aria-hidden="true">|</span>
-          <span id="score-o">O: 0</span>
+          <span id="score-p2">AI: 0</span>
         </footer>
       </section>
     </main>
@@ -54,7 +59,7 @@
     <div class="overlay" id="overlay" aria-hidden="true">
       <div class="result-box" role="dialog" aria-modal="true" aria-labelledby="result-text">
         <div class="result-symbol" id="result-symbol">X</div>
-        <h2 id="result-text">Victorious!</h2>
+        <h2 id="result-text">YOU WIN!</h2>
         <div class="actions">
           <button class="primary" type="button" id="replay">Replay</button>
           <button class="secondary" type="button" id="reset">Reset</button>
@@ -62,6 +67,7 @@
       </div>
     </div>
 
+    <script src="./ai.js"></script>
     <script src="./script.js"></script>
   </body>
 </html>

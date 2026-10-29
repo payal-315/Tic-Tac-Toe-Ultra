@@ -15,40 +15,47 @@
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
-  overflow: hidden;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
 }
 
 #background {
-  position: fixed;
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .game-shell {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: 16px;
 }
 
 .game-panel {
-  width: min(92vw, 430px);
-  height: min(88vh, 620px);
-  min-height: 520px;
-  display: grid;
-  grid-template-rows: auto auto auto auto 1fr auto;
+  position: relative;
+  z-index: 1;
+  width: min(100%, 520px);
+  height: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   background: var(--panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
-  padding: clamp(18px, 4vw, 30px);
+  padding: clamp(16px, 4vw, 30px);
 }
 
 .game-header {
@@ -67,22 +74,33 @@ body {
 h1 {
   margin: 0;
   color: var(--x);
-  font-size: clamp(2rem, 9vw, 3.4rem);
+  font-size: clamp(1.75rem, 9vw, 3.4rem);
   line-height: 1;
   text-transform: uppercase;
 }
 
 .mode-toggle,
 .choice-group,
+.first-player-group,
 .difficulty-group {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 8px 0 0;
+  gap: clamp(6px, 2vw, 10px);
+  min-width: 0;
+  margin: 0;
+}
+
+.difficulty-group {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.difficulty-group[hidden] {
+  display: none;
 }
 
 .mode-button,
 .choice-button,
+.first-player-button,
 .difficulty-button {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
@@ -96,6 +114,7 @@ h1 {
 
 .mode-button.active,
 .choice-button.active,
+.first-player-button.active,
 .difficulty-button.active {
   background: rgba(0, 255, 200, 0.12);
   border-color: rgba(0, 255, 200, 0.5);
@@ -104,9 +123,11 @@ h1 {
 
 .mode-button:hover,
 .choice-button:hover,
+.first-player-button:hover,
 .difficulty-button:hover,
 .mode-button:focus-visible,
 .choice-button:focus-visible,
+.first-player-button:focus-visible,
 .difficulty-button:focus-visible {
   transform: translateY(-1px);
   outline: none;
@@ -115,23 +136,19 @@ h1 {
 .board {
   align-self: center;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: clamp(10px, 3vw, 16px);
-  aspect-ratio: 1;
-  width: 100%;
-  min-height: 0;
-  margin-top: 12px;
+  aspect-ratio: 1 / 1;
+  width: min(100%, 420px);
+  flex: none;
 }
 
 .cell {
   display: grid;
   place-items: center;
   min-width: 0;
-  min-height: 0;
   width: 100%;
-  height: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 1 / 1;
   border: 2px solid var(--cell-border);
   background: var(--cell);
   color: var(--text);
@@ -162,11 +179,13 @@ h1 {
 
 .score-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 14px;
+  gap: 4px 10px;
   color: var(--text);
   font-size: clamp(1rem, 4vw, 1.45rem);
   font-weight: 900;
+  flex: none;
 }
 
 .overlay {
@@ -227,13 +246,21 @@ h2 {
   background: var(--muted);
 }
 
-@media (max-width: 420px) {
-  body {
-    overflow: auto;
+@media (max-width: 767px) {
+  .game-shell {
+    padding: 12px;
   }
 
   .game-panel {
-    min-height: auto;
-    height: auto;
+    width: 100%;
+  }
+
+  .mode-button,
+  .choice-button,
+  .first-player-button,
+  .difficulty-button {
+    min-width: 0;
+    padding: 10px 6px;
+    font-size: clamp(0.65rem, 2.8vw, 0.78rem);
   }
 }

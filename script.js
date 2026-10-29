@@ -1,7 +1,7 @@
 const cells = Array.from(document.querySelectorAll(".cell"));
 const statusLabel = document.querySelector("#status");
-const scoreX = document.querySelector("#score-x");
-const scoreO = document.querySelector("#score-o");
+const scoreP1 = document.querySelector("#score-p1");
+const scoreP2 = document.querySelector("#score-p2");
 const overlay = document.querySelector("#overlay");
 const resultSymbol = document.querySelector("#result-symbol");
 const resultText = document.querySelector("#result-text");
@@ -11,6 +11,7 @@ const canvas = document.querySelector("#background");
 const ctx = canvas.getContext("2d");
 const modeButtons = document.querySelectorAll(".mode-button");
 const playerButtons = document.querySelectorAll(".choice-button");
+const firstPlayerButtons = document.querySelectorAll(".first-player-button");
 const difficultyButtons = document.querySelectorAll(".difficulty-button");
 
 const wins = [
@@ -25,19 +26,32 @@ const wins = [
 ];
 
 let board = Array(9).fill("");
-let xTurn = true;
+let currentTurn = "X";
 let gameOver = false;
-let xScore = 0;
-let oScore = 0;
+const scores = { p1: 0, p2: 0, you: 0, ai: 0 };
 let stickers = [];
 let gameMode = "ai";
 let difficulty = "hard";
-let humanSymbol = "X";
+let p1Symbol = "X";
+let p2Symbol = "O";
+let youSymbol = "X";
+let aiSymbol = "O";
+let firstPlayer = "p1";
 let aiThinking = false;
+let aiTimeout = null;
+let gameGeneration = 0;
+
+const AI_DELAY_MS = 520;
+const DIFFICULTY_BEST_MOVE_CHANCE = { easy: 0.3, medium: 0.5, hard: 1 };
 
 function isHumanTurn() {
   if (gameMode !== "ai") return true;
-  return (xTurn && humanSymbol === "X") || (!xTurn && humanSymbol === "O");
+  return currentTurn === youSymbol;
+}
+
+function getCurrentParticipant() {
+  if (gameMode === "ai") return currentTurn === youSymbol ? "you" : "ai";
+  return currentTurn === p1Symbol ? "p1" : "p2";
 }
 
 function setTurnLabel() {
@@ -48,23 +62,49 @@ function setTurnLabel() {
   }
 
   if (gameMode === "ai") {
+    if (aiThinking) {
+      statusLabel.textContent = "AI THINKING...";
+      statusLabel.style.color = aiSymbol === "X" ? "var(--x)" : "var(--o)";
+      return;
+    }
     if (isHumanTurn()) {
-      statusLabel.textContent = humanSymbol === "X" ? "Your turn" : "Your turn";
-      statusLabel.style.color = humanSymbol === "X" ? "var(--x)" : "var(--o)";
+      statusLabel.textContent = "YOUR TURN";
+      statusLabel.style.color = youSymbol === "X" ? "var(--x)" : "var(--o)";
     } else {
-      statusLabel.textContent = "AI turn";
-      statusLabel.style.color = xTurn ? "var(--x)" : "var(--o)";
+      statusLabel.textContent = "AI THINKING...";
+      statusLabel.style.color = aiSymbol === "X" ? "var(--x)" : "var(--o)";
     }
     return;
   }
 
-  statusLabel.textContent = xTurn ? "Player X" : "Player O";
-  statusLabel.style.color = xTurn ? "var(--x)" : "var(--o)";
+  statusLabel.textContent = getCurrentParticipant() === "p1" ? "PLAYER 1'S TURN" : "PLAYER 2'S TURN";
+  statusLabel.style.color = currentTurn === "X" ? "var(--x)" : "var(--o)";
 }
 
 function updateScore() {
-  scoreX.textContent = `X: ${xScore}`;
-  scoreO.textContent = `O: ${oScore}`;
+  const isAiMode = gameMode === "ai";
+  scoreP1.textContent = `${isAiMode ? "YOU" : "PLAYER 1"}: ${isAiMode ? scores.you : scores.p1}`;
+  scoreP2.textContent = `${isAiMode ? "AI" : "PLAYER 2"}: ${isAiMode ? scores.ai : scores.p2}`;
+}
+
+function updateModeOptions() {
+  const isAiMode = gameMode === "ai";
+  const firstLabels = isAiMode
+    ? { p1: "You First", p2: "AI First" }
+    : { p1: "Player 1 First", p2: "Player 2 First" };
+
+  playerButtons.forEach((button) => {
+    button.textContent = `${isAiMode ? "You" : "Player 1"}: ${button.dataset.player}`;
+    button.classList.toggle("active", button.dataset.player === p1Symbol);
+  });
+  firstPlayerButtons.forEach((button) => {
+    button.textContent = firstLabels[button.dataset.first];
+    button.classList.toggle("active", button.dataset.first === firstPlayer);
+  });
+  document.querySelector(".difficulty-group").hidden = !isAiMode;
+  document.querySelector(".choice-group").setAttribute("aria-label", isAiMode ? "Choose your symbol" : "Choose Player 1's symbol");
+  document.querySelector(".first-player-group").setAttribute("aria-label", isAiMode ? "Who goes first" : "Which player goes first");
+  updateScore();
 }
 
 function getWinnerFromBoard(gameBoard = board) {
@@ -76,14 +116,17 @@ function getWinnerFromBoard(gameBoard = board) {
   return "";
 }
 
-function makeMove(index) {
-  if (board[index] || gameOver || aiThinking) return;
+function makeMove(index, isAiMove = false) {
+  if (board[index] || gameOver) return;
 
-  if (gameMode === "ai" && !isHumanTurn()) {
+  if (gameMode === "ai") {
+    if (isAiMove ? (!aiThinking || currentTurn !== aiSymbol) : (aiThinking || currentTurn !== youSymbol)) return;
+  } else if (isAiMove) {
     return;
   }
+  if (isAiMove) aiThinking = false;
 
-  const symbol = xTurn ? "X" : "O";
+  const symbol = currentTurn;
   board[index] = symbol;
   cells[index].textContent = symbol;
   cells[index].classList.add(symbol.toLowerCase());
@@ -91,25 +134,42 @@ function makeMove(index) {
 
   const winner = getWinnerFromBoard();
   if (winner) {
-    gameOver = true;
-    winner === "X" ? xScore++ : oScore++;
-    updateScore();
-    showResult(winner, "Victorious!");
+    finishRound(winner);
     return;
   }
 
   if (board.every(Boolean)) {
-    gameOver = true;
-    showResult("=", "Draw Game");
+    finishRound(null);
     return;
   }
 
-  xTurn = !xTurn;
+  currentTurn = currentTurn === "X" ? "O" : "X";
   setTurnLabel();
 
-  if (gameMode === "ai" && !isHumanTurn() && !gameOver) {
+  if (gameMode === "ai" && currentTurn === aiSymbol && !gameOver) {
     queueAiTurn();
   }
+}
+
+function finishRound(winnerSymbol) {
+  if (gameOver) return;
+  gameOver = true;
+  cancelAiTurn();
+
+  let message = "DRAW";
+  if (winnerSymbol) {
+    const participant = gameMode === "ai"
+      ? (winnerSymbol === youSymbol ? "you" : "ai")
+      : (winnerSymbol === p1Symbol ? "p1" : "p2");
+    scores[participant]++;
+    message = gameMode === "ai"
+      ? (participant === "you" ? "YOU WIN!" : "AI WINS!")
+      : (participant === "p1" ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!");
+  }
+
+  updateScore();
+  setTurnLabel();
+  showResult(winnerSymbol || "=", message);
 }
 
 function showResult(symbol, message) {
@@ -123,14 +183,16 @@ function showResult(symbol, message) {
 }
 
 function resetGame(resetScores = false) {
+  cancelAiTurn();
   board = Array(9).fill("");
-  xTurn = true;
-  gameOver = false;
-  aiThinking = false;
-
-  if (gameMode === "ai" && humanSymbol === "O") {
-    xTurn = false;
+  if (gameMode === "ai") {
+    const firstMover = firstPlayer === "p1" ? "you" : "ai";
+    currentTurn = firstMover === "you" ? youSymbol : aiSymbol;
+  } else {
+    const startingSymbol = firstPlayer === "p1" ? p1Symbol : p2Symbol;
+    currentTurn = startingSymbol;
   }
+  gameOver = false;
 
   cells.forEach((cell, index) => {
     cell.textContent = "";
@@ -139,8 +201,10 @@ function resetGame(resetScores = false) {
   });
 
   if (resetScores) {
-    xScore = 0;
-    oScore = 0;
+    scores.p1 = 0;
+    scores.p2 = 0;
+    scores.you = 0;
+    scores.ai = 0;
     updateScore();
   }
 
@@ -148,7 +212,7 @@ function resetGame(resetScores = false) {
   overlay.setAttribute("aria-hidden", "true");
   setTurnLabel();
 
-  if (gameMode === "ai" && !isHumanTurn() && !gameOver) {
+  if (gameMode === "ai" && currentTurn === aiSymbol && !gameOver) {
     queueAiTurn();
   }
 }
@@ -202,118 +266,88 @@ function drawBackground() {
 
 function getAvailableMoves(gameBoard) {
   return gameBoard
-    .map((cell, index) => (cell === "" ? index : null))
+    .map((cell, index) => (!cell ? index : null))
     .filter((index) => index !== null);
-}
-
-function minimax(gameBoard, depth, isMaximizing, aiSymbol, humanSymbol) {
-  const winner = getWinnerFromBoard(gameBoard);
-
-  if (winner === aiSymbol) return 10 - depth;
-  if (winner === humanSymbol) return depth - 10;
-  if (gameBoard.every(Boolean)) return 0;
-
-  if (isMaximizing) {
-    let bestScore = -Infinity;
-
-    for (const move of getAvailableMoves(gameBoard)) {
-      const nextBoard = [...gameBoard];
-      nextBoard[move] = aiSymbol;
-      const score = minimax(nextBoard, depth + 1, false, aiSymbol, humanSymbol);
-      bestScore = Math.max(bestScore, score);
-    }
-
-    return bestScore;
-  }
-
-  let bestScore = Infinity;
-
-  for (const move of getAvailableMoves(gameBoard)) {
-    const nextBoard = [...gameBoard];
-    nextBoard[move] = humanSymbol;
-    const score = minimax(nextBoard, depth + 1, true, aiSymbol, humanSymbol);
-    bestScore = Math.min(bestScore, score);
-  }
-
-  return bestScore;
-}
-
-function findBestMove() {
-  const aiSymbol = humanSymbol === "X" ? "O" : "X";
-  const humanMark = humanSymbol;
-
-  let bestScore = -Infinity;
-  let bestMove = null;
-
-  for (const move of getAvailableMoves(board)) {
-    const nextBoard = [...board];
-    nextBoard[move] = aiSymbol;
-
-    const score = minimax(nextBoard, 0, false, aiSymbol, humanMark);
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMove = move;
-    }
-  }
-
-  return bestMove;
 }
 
 function chooseAiMove() {
   const availableMoves = getAvailableMoves(board);
 
   if (availableMoves.length === 0) return null;
-
-  if (difficulty === "easy") {
-    return availableMoves[Math.floor(Math.random() * availableMoves.length)];
-  }
-
-  return findBestMove();
+  const bestMove = window.getBestMove([...board], aiSymbol, youSymbol);
+  const bestMoveChance = DIFFICULTY_BEST_MOVE_CHANCE[difficulty] ?? 1;
+  return Math.random() < bestMoveChance
+    ? bestMove
+    : availableMoves[Math.floor(Math.random() * availableMoves.length)];
 }
 
 function queueAiTurn() {
-  if (gameMode !== "ai" || gameOver || isHumanTurn()) return;
+  if (gameMode !== "ai" || gameOver || currentTurn !== aiSymbol || aiThinking || aiTimeout !== null) return;
 
   aiThinking = true;
   setTurnLabel();
+  const scheduledGeneration = gameGeneration;
 
-  window.setTimeout(() => {
-    if (gameOver) return;
+  const timeoutId = window.setTimeout(() => {
+    if (aiTimeout === timeoutId) aiTimeout = null;
+    if (scheduledGeneration !== gameGeneration || gameMode !== "ai" || gameOver || currentTurn !== aiSymbol) return;
 
     const move = chooseAiMove();
 
-    aiThinking = false;
-
     if (move !== null) {
-      makeMove(move);
+      makeMove(move, true);
     } else {
       setTurnLabel();
     }
-  }, 420);
+  }, AI_DELAY_MS);
+  aiTimeout = timeoutId;
+}
+
+function cancelAiTurn() {
+  gameGeneration++;
+  if (aiTimeout !== null) {
+    window.clearTimeout(aiTimeout);
+    aiTimeout = null;
+  }
+  aiThinking = false;
 }
 
 function setGameMode(mode) {
+  if (gameMode === mode) return;
+  cancelAiTurn();
   gameMode = mode;
   modeButtons.forEach((button) => {
     const isActive = button.dataset.mode === mode;
     button.classList.toggle("active", isActive);
   });
 
+  updateModeOptions();
   resetGame(true);
 }
 
-function setHumanSymbol(symbol) {
-  humanSymbol = symbol;
-  playerButtons.forEach((button) => {
-    const isActive = button.dataset.player === symbol;
-    button.classList.toggle("active", isActive);
-  });
+function setP1Symbol(symbol) {
+  if (p1Symbol === symbol) return;
+  cancelAiTurn();
+  p1Symbol = symbol;
+  p2Symbol = symbol === "X" ? "O" : "X";
+  youSymbol = p1Symbol;
+  aiSymbol = p2Symbol;
 
-  resetGame(true);
+  updateModeOptions();
+  resetGame(false);
+}
+
+function setFirstPlayer(player) {
+  if (firstPlayer === player) return;
+  cancelAiTurn();
+  firstPlayer = player;
+  updateModeOptions();
+  resetGame(false);
 }
 
 function setDifficulty(level) {
+  if (difficulty === level) return;
+  cancelAiTurn();
   difficulty = level;
   difficultyButtons.forEach((button) => {
     const isActive = button.dataset.difficulty === level;
@@ -321,7 +355,7 @@ function setDifficulty(level) {
   });
 
   if (gameMode === "ai") {
-    resetGame(true);
+    resetGame(false);
   }
 }
 
@@ -334,7 +368,11 @@ modeButtons.forEach((button) => {
 });
 
 playerButtons.forEach((button) => {
-  button.addEventListener("click", () => setHumanSymbol(button.dataset.player));
+  button.addEventListener("click", () => setP1Symbol(button.dataset.player));
+});
+
+firstPlayerButtons.forEach((button) => {
+  button.addEventListener("click", () => setFirstPlayer(button.dataset.first));
 });
 
 difficultyButtons.forEach((button) => {
@@ -346,6 +384,6 @@ resetButton.addEventListener("click", () => resetGame(true));
 window.addEventListener("resize", resizeCanvas);
 
 setTurnLabel();
-updateScore();
+updateModeOptions();
 resizeCanvas();
 drawBackground();
